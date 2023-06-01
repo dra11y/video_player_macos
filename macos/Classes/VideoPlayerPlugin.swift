@@ -19,7 +19,6 @@ extension FlutterPluginRegistrar {
     /// https://github.com/flutter/flutter/issues/47681
     /// Replaces non-existent `FlutterPluginRegistrar.lookupKey`
     func url(forAsset asset: String, package: String? = nil) -> URL? {
-        print("url(forAsset: \(asset), package: \(package)")
         guard
             let flutterBundle = Bundle(identifier: "io.flutter.flutter.app"),
             let path = flutterBundle.path(forResource: asset, ofType: nil, inDirectory: "flutter_assets")
@@ -36,7 +35,7 @@ class FVPDefaultPlayerFactory: NSObject, FVPPlayerFactory {
 
 public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     func setMixWithOthers(msg: MixWithOthersMessage) throws {
-        print("setMixWithOthers not needed on macOS.")
+        /// setMixWithOthers not needed/implemented on macOS.
     }
 
     weak var registry: FlutterTextureRegistry?
@@ -51,7 +50,6 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     init(registrar: FlutterPluginRegistrar) {
-        print("init registrar:")
         super.init()
         self.registry = registrar.textures
         self.messenger = registrar.messenger
@@ -60,14 +58,12 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func detach(from registrar: FlutterPluginRegistrar) {
-        print("detach from registrar")
         playersByTextureId.values.forEach { $0.disposeSansEventChannel() }
         playersByTextureId.removeAll()
     }
 
     func onPlayerSetup(player: VideoPlayer, frameUpdater: FrameUpdater) -> TextureMessage {
         let textureId = registry!.register(player)
-        print("onPlayerSetup textureId = \(textureId)")
         frameUpdater.textureId = textureId
         let eventChannel = FlutterEventChannel(name: "flutter.io/videoPlayer/videoEvents\(textureId)", binaryMessenger: messenger!)
         eventChannel.setStreamHandler(player)
@@ -77,10 +73,7 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func initialize() throws {
-        print("initialize()")
-
         playersByTextureId.forEach { (textureId, player) in
-            print("disposing player by texture id \(textureId)")
             registry?.unregisterTexture(textureId)
             player.dispose()
         }
@@ -88,8 +81,6 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func create(msg input: CreateMessage) throws -> TextureMessage {
-        print("create msg: \(input)")
-
         guard let registry = registry else {
             throw FlutterError(code: "video_player", message: "Registry is nil", details: nil)
         }
@@ -103,7 +94,6 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
             let player = VideoPlayer(url: url, frameUpdater: frameUpdater)
             return onPlayerSetup(player: player, frameUpdater: frameUpdater)
         } else if let uri = input.uri {
-            print("create with uri = \(input.uri)")
             let player = VideoPlayer(url: URL(string: uri)!, frameUpdater: frameUpdater, httpHeaders: input.httpHeaders as? [String: String], playerFactory: playerFactory)
             return onPlayerSetup(player: player, frameUpdater: frameUpdater)
         } else {
@@ -112,8 +102,6 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func dispose(msg input: TextureMessage) {
-        print("dispose msg: \(input)")
-
         let player = playersByTextureId[input.textureId]
         registry?.unregisterTexture(input.textureId)
         playersByTextureId.removeValue(forKey: input.textureId)
@@ -127,42 +115,30 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func setLooping(msg input: LoopingMessage) {
-        print("setLooping msg: \(input)")
-
         let player = playersByTextureId[input.textureId]
         player?.isLooping = input.isLooping
     }
 
     func setVolume(msg input: VolumeMessage) {
-        print("setVolume msg: \(input)")
-
         let player = playersByTextureId[input.textureId]
         player?.setVolume(input.volume)
     }
 
     func setPlaybackSpeed(msg input: PlaybackSpeedMessage) {
-        print("setPlaybackSpeed msg: \(input)")
-
         let player = playersByTextureId[input.textureId]
         player?.setPlaybackSpeed(input.speed)
     }
 
     func play(msg input: TextureMessage) {
-        print("play msg: \(input)")
-
         playersByTextureId[input.textureId]?.play()
     }
 
     func position(msg input: TextureMessage) throws -> PositionMessage {
-        print("position msg: \(input)")
-
         let player = playersByTextureId[input.textureId]
         return PositionMessage(textureId: input.textureId, position: player?.position ?? 0)
     }
 
     func seekTo(msg input: PositionMessage, completion: @escaping (Result<Void, Error>) -> Void) {
-        print("seekTo msg: \(input)")
-
         guard let player = playersByTextureId[input.textureId] else { return }
         player.seek(to: Int(input.position), completionHandler: { finished in
             DispatchQueue.main.async { [weak self] in
@@ -173,8 +149,6 @@ public class VideoPlayerPlugin: NSObject, AVFoundationVideoPlayerApi {
     }
 
     func pause(msg input: TextureMessage) {
-        print("pause msg: \(input)")
-
         let textureId = input.textureId
         let player = playersByTextureId[textureId]
         player?.pause()
@@ -246,7 +220,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     required init(playerItem item: AVPlayerItem, frameUpdater: FrameUpdater, playerFactory: FVPPlayerFactory? = nil) {
-        print("VideoPlayer.init playerItem: \(item)")
         isInitialized = false
         isPlaying = false
         disposed = false
@@ -258,7 +231,7 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
         isLooping = false
         
         super.init()
-
+        
         let asset = item.asset
 
         let assetCompletionHandler: () -> Void = { [weak self] in
@@ -297,7 +270,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func addObservers(item: AVPlayerItem) {
-        print("addObservers item: \(item)")
         for key in ObserverKey.allCases {
             if key == .rate {
                 player.addObserver(self, forKeyPath: key.rawValue, context: nil)
@@ -310,7 +282,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
      }
 
     @objc func itemDidPlayToEndTime(notification: Notification) {
-        print("itemDidPlayToEndTime")
         if isLooping {
             guard let p = notification.object as? AVPlayerItem else { return }
             p.seek(to: .zero, completionHandler: nil)
@@ -322,7 +293,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     static func radiansToDegrees(_ radians: CGFloat) -> CGFloat {
-        print("radiansToDegrees radians: \(radians)")
         // Input range [-pi, pi] or [-180, 180]
         var degrees = GLKMathRadiansToDegrees(Float(radians))
         if degrees < 0 {
@@ -334,7 +304,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func getVideoComposition(withTransform transform: CGAffineTransform, withAsset asset: AVAsset, withVideoTrack videoTrack: AVAssetTrack) -> AVMutableVideoComposition {
-        print("getVideoComposition")
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRangeMake(start: .zero, duration: asset.duration)
 
@@ -364,7 +333,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 
     func createVideoOutputAndDisplayLink(frameUpdater: FrameUpdater) {
-        print("createVideoOutputAndDisplayLink")
         let pixBuffAttributes: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferIOSurfacePropertiesKey as String: [:] as [AnyHashable: Any],
@@ -380,7 +348,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func notifyIfFrameAvailable() {
-//        print("notifyIfFrameAvailable()")
         guard let videoOutput = videoOutput else { return }
         let outputItemTime = videoOutput.itemTime(forHostTime: CACurrentMediaTime())
         if playerItem.status != .readyToPlay || !videoOutput.hasNewPixelBuffer(forItemTime: outputItemTime) {
@@ -402,14 +369,12 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     let OnDisplayLink: CVDisplayLinkOutputCallback = { (displayLink, inNow, inOutputTime, flagsIn, flagsOut, displayLinkContext) -> CVReturn in
-//        print("OnDisplayLink")
         let videoPlayer = Unmanaged<VideoPlayer>.fromOpaque(displayLinkContext!).takeUnretainedValue()
         videoPlayer.notifyIfFrameAvailable()
         return kCVReturnSuccess
     }
 
     func startDisplayLink() {
-        print("startDisplayLink()")
         guard displayLink == nil else { return }
 
         if CVDisplayLinkCreateWithCGDisplay(CGMainDisplayID(), &displayLink) != kCVReturnSuccess {
@@ -422,7 +387,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func stopDisplayLink() {
-        print("stopDisplayLink()")
         guard displayLink != nil else { return }
 
         CVDisplayLinkStop(displayLink!)
@@ -430,7 +394,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func fixTransform(videoTrack: AVAssetTrack) -> CGAffineTransform {
-        print("fixTransform()")
         var transform = videoTrack.preferredTransform
         // TODO(@recastrodiaz): why do we need to do this? Why is the
         // preferredTransform incorrect? At least 2 user videos show a black screen
@@ -440,13 +403,13 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
         // https://github.com/flutter/flutter/issues/17606#issuecomment-413473181
         if transform.tx == 0 && transform.ty == 0 {
             let rotationDegrees = Int(round(Self.radiansToDegrees(atan2(transform.b, transform.a))))
-            print("TX and TY are 0. Rotation: \(rotationDegrees). Natural width,height: \(videoTrack.naturalSize.width), \(videoTrack.naturalSize.height)")
+//            print("TX and TY are 0. Rotation: \(rotationDegrees). Natural width,height: \(videoTrack.naturalSize.width), \(videoTrack.naturalSize.height)")
             if rotationDegrees == 90 {
-                print("Setting transform tx")
+                print("Setting transform tx for rotationDegrees == \(rotationDegrees)")
                 transform.tx = videoTrack.naturalSize.height
                 transform.ty = 0
             } else if rotationDegrees == 270 {
-                print("Setting transform ty")
+                print("Setting transform ty for rotationDegrees == \(rotationDegrees)")
                 transform.tx = 0
                 transform.ty = videoTrack.naturalSize.width
             }
@@ -470,7 +433,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
             case .unknown:
                 break
             case .readyToPlay:
-                print(".readyToPlay")
                 if let videoOutput = videoOutput {
                     item.add(videoOutput)
                     setupEventSinkIfReadyToPlay()
@@ -529,8 +491,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func updatePlayingState() {
-        print("updatePlayingState()")
-
         guard
             isInitialized,
             let displayLink = displayLink
@@ -545,7 +505,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func setupEventSinkIfReadyToPlay() {
-        print("setupEventSinkIfReadyToPlay()")
         if eventSink != nil && !isInitialized {
             let size = player.currentItem?.presentationSize ?? .zero
             
@@ -583,14 +542,12 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
                     return
                 }
                 
-                print("isInitialized = true")
-                
                 isInitialized = true
                 eventSink?([
                     "event" : "initialized",
-                    "duration" : NSNumber(value: duration.seconds),
-                    "width" : NSNumber(value: Double(size.width)),
-                    "height" : NSNumber(value: Double(size.height))
+                    "duration" : Int(duration.seconds.rounded()),
+                    "width" : Int(size.width.rounded()),
+                    "height" : Int(size.height.rounded())
                 ] as [String : Any])
                 
                 //            // The player has not yet initialized.
@@ -615,13 +572,11 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func play() {
-        print("play()")
         isPlaying = true
         updatePlayingState()
     }
 
     func pause() {
-        print("pause()")
         isPlaying = false
         updatePlayingState()
     }
@@ -638,7 +593,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func seek(to location: Int, completionHandler: @escaping (Bool) -> Void) {
-        print("seek to: \(location)")
         player.seek(to: CMTimeMake(value: Int64(location), timescale: 1000), toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: completionHandler)
         notifyIfFrameAvailable()
     }
@@ -648,12 +602,10 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func setVolume(_ volume: Double) {
-        print("setVolume: \(volume)")
         player.volume = Float(volume < 0.0 ? 0.0 : (volume > 1.0 ? 1.0 : volume))
     }
 
     func setPlaybackSpeed(_ speed: Double) {
-        print("setPlaybackSpeed: \(speed)")
         // See https://developer.apple.com/library/archive/qa/qa1772/_index.html for
         // an explanation of these checks.
         if speed > 2.0, player.currentItem?.canPlayFastForward == false {
@@ -718,20 +670,17 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     }
 
     func onTextureUnregistered(_ texture: FlutterTexture) {
-        print("onTextureUnregistered")
         DispatchQueue.main.async {
             self.dispose()
         }
     }
     
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        print("onCancel")
         eventSink = nil
         return nil
     }
 
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        print("onListen withArguments: \(arguments)")
         self.eventSink = events
         // TODO(@recastrodiaz): remove the line below when the race condition is
         // resolved: https://github.com/flutter/flutter/issues/21483 This line
@@ -746,7 +695,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     /// is useful for the case where the Engine is in the process of deconstruction
     /// so the channel is going to die or is already dead.
     func disposeSansEventChannel() {
-        print("disposeSansEventChannel()")
         disposed = true
         stopDisplayLink()
         if let currentItem = player.currentItem {
@@ -764,7 +712,6 @@ class VideoPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
     
 
     func dispose() {
-        print("dispose()")
         disposeSansEventChannel()
         eventChannel?.setStreamHandler(nil)
     }

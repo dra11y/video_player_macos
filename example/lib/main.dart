@@ -42,8 +42,8 @@ class _App extends StatelessWidget {
         ),
         body: TabBarView(
           children: <Widget>[
-            // _BumbleBeeRemoteVideo(),
-            // _BumbleBeeEncryptedLiveStream(),
+            _BumbleBeeRemoteVideo(),
+            _BumbleBeeEncryptedLiveStream(),
             _ButterFlyAssetVideo(),
           ],
         ),
